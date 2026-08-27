@@ -356,12 +356,75 @@ shake-to-alert, panic hold animation.
 - The bottom panel on the tracking screen is a static Card, not a draggable
   animated sheet (see above) — a known, deliberate scope trim, not a bug.
 
+### Session 3A — Camera and media (complete)
+
+- `server/src/middleware/upload.middleware.js`: multer disk storage into
+  `server/uploads/` (gitignored), filenames as `<userId>-<timestamp>.<ext>`,
+  rejects non-image/video mimetypes and files over 50MB.
+  `server/src/controllers/media.controller.js` + `routes/media.routes.js`:
+  `POST /api/media` (protected), returns `{ url: "/uploads/<filename>" }`.
+  Mounted at `/api/media`; `/uploads` served statically via
+  `express.static`. `error.middleware.js` now formats `MulterError` as a 400.
+  **This is the one backend piece verified with real, working I/O this
+  build** — not just curl-against-a-401, actual disk storage: an isolated
+  test harness (bypassing the DB-gated auth layer specifically to exercise
+  the upload mechanism) confirmed a real file lands on disk with the correct
+  size/mimetype, a disallowed file type is rejected with a clean 400, and the
+  static route serves the uploaded file back byte-for-byte identical.
+- `hooks/useCamera.js`: wraps `expo-camera`'s `useCameraPermissions` +
+  `useMicrophonePermissions` (video needs both) into
+  loading/granted/denied state, plus facing/torch/zoom as local UI state.
+- `components/camera/CaptureControls.jsx` (flip, torch, zoom +/-, one
+  capture button — tap for photo, hold for video with a recording
+  indicator) and `MediaPreview.jsx` (full-screen image or `expo-av` video
+  playback, Retake/Use, upload progress bar).
+- `services/media.js`: `uploadMedia({ uri, type, onProgress })` — multipart
+  `FormData`, progress via axios's `onUploadProgress`.
+- `app/camera.jsx`: full permission/loading/denied/granted states, live
+  `CameraView` or a gallery picker (`expo-image-picker`) as an alternative
+  source, both landing in the same preview → retake/use → upload flow.
+  **Compression** is handled by capturing/picking at `quality: 0.5` rather
+  than a separate post-processing step — `expo-image-manipulator` isn't in
+  the approved dependency list, and controlling quality at the capture
+  source is a legitimate, simpler approach than compressing afterward.
+  Wired to a temporary "Camera" quick action on the dashboard so it's
+  reachable and testable now; session 3B's panic button will likely become
+  the real entry point.
+- Installed `expo-camera`, `expo-image-picker`, `expo-av`, and (server-side)
+  `multer`. Added camera/microphone/photo-library permission plugin config
+  to `app.json`, re-ran `expo prebuild`.
+- Validated with `npx expo export --platform ios` (clean bundle, 1233
+  modules, zero errors).
+
+### Known issue / limitation
+
+- `expo-av` resolved to `16.0.8` (its own independent versioning, not tied to
+  the SDK 57 bundle the way `expo-camera`/`expo-image-picker` are) — it
+  installed and imports cleanly, but it's the one dependency this session
+  that isn't officially "SDK-blessed" for this Expo version anymore (Expo's
+  own direction is `expo-video`/`expo-audio`). It's used here only for video
+  *preview playback*, the narrowest possible use. Worth a real device check
+  first, and worth knowing this is a future migration point if `expo-av`
+  stops being maintained.
+- Same sandbox limitation as every session for anything needing a device:
+  camera/gallery permission prompts, actual capture, recording, and playback
+  are all unverified beyond clean bundling — there's no camera or gallery in
+  this sandbox at all, so unlike location/contacts this could never have been
+  curl-tested even indirectly. First things to check on a real device: photo
+  capture, hold-to-record video with playback, flip/torch/zoom, gallery
+  picker, and a real end-to-end upload against a live backend.
+- Tap-to-focus from the original brief wording is not implemented as literal
+  tap-to-set-focus-point — `expo-camera`'s `CameraView` doesn't expose a
+  simple focus-at-point API in this version. Zoom and flip are real; treat
+  "tap-to-focus" as not covered rather than assuming it works.
+
 ## Next step
 
-**Session 3A**: Camera and media — camera screen with flip/torch/zoom/tap-to-
-focus, capture, preview, retake, video record start/stop with playback,
-gallery picker, compression, multipart upload with progress. Needs
-`expo-camera`, `expo-image-picker`, `expo-av`, and `multer` on the server —
-none of these are installed yet. This is also where the Phase 0 caution about
-`expo-camera` not working in Expo Go actually matters — the dev client set up
-in session 1A is what makes this possible.
+**Session 3B**: Safety features — panic button with hold-to-activate fill
+animation and haptics, incident creation with media attached (needs an
+`Incident` model + routes on the server — not built yet, and this is where
+`app/incident/[id].jsx`'s placeholder finally gets replaced), fake call
+screen with ringtone and vibration, shake-to-alert detector. This is also
+where `react-native-reanimated`, `react-native-gesture-handler`, and
+`expo-haptics` get installed for the first time — none of the work so far has
+needed them.
