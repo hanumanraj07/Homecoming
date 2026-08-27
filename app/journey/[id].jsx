@@ -1,12 +1,14 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import { Badge, Button, EmptyState } from '../../components/ui';
+import { PanicButton } from '../../components/journey/PanicButton';
 import { useTheme } from '../../context/ThemeContext';
 import { useToast } from '../../context/ToastContext';
 import { useCountdown } from '../../hooks/useCountdown';
 import { useLocation } from '../../hooks/useLocation';
+import { useShakeDetector } from '../../hooks/useShakeDetector';
 import { checkInJourney, getJourney, updateJourneyLocation } from '../../services/journeys';
 
 const DELTA = { latitudeDelta: 0.01, longitudeDelta: 0.01 };
@@ -59,6 +61,12 @@ export default function JourneyDetailScreen() {
       setIsCheckingIn(false);
     }
   };
+
+  const triggerPanic = useCallback(() => {
+    router.push({ pathname: '/incident/new', params: journey?._id ? { journeyId: journey._id } : {} });
+  }, [journey?._id]);
+
+  useShakeDetector(triggerPanic, { enabled: isActive });
 
   if (loadState === 'loading') {
     return (
@@ -115,6 +123,12 @@ export default function JourneyDetailScreen() {
           <Polyline coordinates={pathCoordinates} strokeColor={colors.primary} strokeWidth={4} />
         ) : null}
       </MapView>
+
+      {isActive ? (
+        <View style={{ position: 'absolute', top: spacing.xl, right: spacing.lg }}>
+          <PanicButton onActivate={triggerPanic} />
+        </View>
+      ) : null}
 
       <View
         style={[

@@ -2,9 +2,11 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { Badge, EmptyState } from '../../components/ui';
+import { PanicButton } from '../../components/journey/PanicButton';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useCountdown } from '../../hooks/useCountdown';
+import { useShakeDetector } from '../../hooks/useShakeDetector';
 import { listJourneys } from '../../services/journeys';
 
 const QUICK_ACTIONS = [
@@ -157,22 +159,30 @@ export default function HomeScreen() {
   const activeJourney = journeys.find((journey) => journey.status === 'active');
   const historyJourneys = journeys.filter((journey) => journey.status !== 'active');
 
+  const triggerPanic = useCallback(() => {
+    router.push({ pathname: '/incident/new', params: activeJourney ? { journeyId: activeJourney._id } : {} });
+  }, [activeJourney]);
+
+  useShakeDetector(triggerPanic);
+
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.background }}
       contentContainerStyle={{ padding: spacing.lg }}
       refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
     >
-      <Text
-        style={{
-          color: colors.textPrimary,
-          fontSize: typography.size.xxl,
-          fontWeight: typography.weight.bold,
-          marginBottom: spacing.lg,
-        }}
-      >
-        Hi, {firstName}
-      </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.lg }}>
+        <Text
+          style={{
+            color: colors.textPrimary,
+            fontSize: typography.size.xxl,
+            fontWeight: typography.weight.bold,
+          }}
+        >
+          Hi, {firstName}
+        </Text>
+        <PanicButton onActivate={triggerPanic} />
+      </View>
 
       {loadState === 'loading' ? (
         <View style={{ paddingVertical: spacing.xl, alignItems: 'center' }}>
