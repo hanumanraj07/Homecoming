@@ -20,7 +20,14 @@ export default function AppLayout() {
   }
 
   return (
-    <Tabs>
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textTertiary,
+        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
+      }}
+    >
       <Tabs.Screen name="index" options={{ title: 'Home' }} />
       <Tabs.Screen name="map" options={{ title: 'Map' }} />
       <Tabs.Screen name="guardians" options={{ title: 'Guardians' }} />
