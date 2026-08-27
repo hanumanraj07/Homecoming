@@ -216,10 +216,55 @@ shake-to-alert, panic hold animation.
   rendering on the dashboard/profile could only be verified against the
   API's response shape, not against a real logged-in session on a device.
 
+### Session 2B — Contacts and guardians (complete)
+
+- **Bug fix, found while testing**: `server/src/middleware/auth.middleware.js`'s
+  `protect()` wrapped both `jwt.verify()` and the `User.findById()` DB lookup in
+  one try/catch, so an unreachable/slow database surfaced as a misleading 401
+  "Invalid or expired token" after a 10s buffering timeout instead of the real
+  error. Fixed: only `verify()` failures produce that 401 now; a DB failure
+  propagates to the normal error handler as a 500 with its real message.
+  Confirmed with curl (see below) — this affects every protected route,
+  including the auth routes from session 1C, not just guardians.
+- `server/src/models/Guardian.js`: matches the data model spec — userId, name,
+  phone, relation, isPrimary, contactId.
+- `server/src/{validators,controllers,routes}/guardian.*`: full CRUD,
+  protected and scoped to `req.user._id` — `GET/POST /api/guardians`,
+  `PATCH/DELETE /api/guardians/:id`. Mounted in `app.js`.
+- `hooks/useContacts.js`: requests contacts permission, loads device contacts
+  with phone numbers, exposes `status/contacts/isLoading/error`.
+- `services/guardians.js`: list/create/update/delete wrappers over the axios
+  instance.
+- `app/(app)/guardians.jsx`: full loading/error/empty/success states for the
+  list. "Add a guardian" offers two paths — import from contacts (search,
+  multi-select, a real permission-denied state with an Open Settings button)
+  or manual entry — both feeding one edit/delete form with a primary-guardian
+  toggle. Each row has direct tap-to-call and WhatsApp buttons via `Linking`
+  (WhatsApp checks `canOpenURL` first and toasts if it's not installed).
+- Installed `expo-contacts`, added its permission plugin config to
+  `app.json`, re-ran `expo prebuild` to regenerate native projects with it.
+- Validated with `npx expo export --platform ios` (clean bundle, 1157
+  modules, zero errors).
+
+### Known issue / limitation
+
+- Guardian routes were tested the same way as the auth routes in 1C: with curl
+  against the running server. All auth-guard behavior was confirmed —
+  missing token → 401 on every route (list/create/update/delete), and (after
+  the bug fix above) a valid token with the DB unreachable now correctly
+  returns a clean 500 with the real Mongoose error instead of a false 401.
+  What could **not** be tested here: an authenticated request actually
+  reaching the controller and validators (every route requires `protect()`,
+  which itself needs a DB lookup, so there's no way to reach guardian-specific
+  validation errors without a live database) or the frontend contact-import
+  flow (needs a real device with contacts and a live API). First things to
+  check on a real device: permission-denied state, search/multi-select import,
+  manual add/edit/delete, and call/WhatsApp buttons.
+
 ## Next step
 
-**Session 2B**: Contacts and guardians — permission flow with a denied state
-(`EmptyState` + `Linking.openSettings()`), contact import with search and
-multi-select (`expo-contacts`), guardian CRUD against the backend (needs a
-`Guardian` model + routes on the server — not built yet), add/edit/delete
-contact, tap-to-call and WhatsApp via `Linking`.
+**Session 2C**: Location and maps — permission handling, current + last known
+position, map screen with markers (`react-native-maps`, not installed yet),
+recenter button, reverse geocoding, destination search, `useLocation` hook
+with correct cleanup in the `useEffect` return (no background location — that
+scope decision is already documented in the README).
