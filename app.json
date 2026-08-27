@@ -27,7 +27,13 @@
     "plugins": [
       "expo-router",
       "expo-dev-client",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Homecoming uses your contacts to help you choose guardians for your journeys."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
