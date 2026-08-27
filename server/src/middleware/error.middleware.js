@@ -18,6 +18,8 @@ function errorHandler(err, _req, res, _next) {
   } else if (err.name === 'CastError') {
     statusCode = 400;
     message = 'Invalid identifier';
+  } else if (err.name === 'MulterError') {
+    statusCode = 400;
   }
 
   if (statusCode === 500) {
