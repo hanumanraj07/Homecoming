@@ -3,6 +3,7 @@ const authRoutes = require('./routes/auth.routes');
 const guardianRoutes = require('./routes/guardian.routes');
 const journeyRoutes = require('./routes/journey.routes');
 const mediaRoutes = require('./routes/media.routes');
+const incidentRoutes = require('./routes/incident.routes');
 const { UPLOAD_DIR } = require('./middleware/upload.middleware');
 const { notFound, errorHandler } = require('./middleware/error.middleware');
 
@@ -18,6 +19,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/guardians', guardianRoutes);
 app.use('/api/journeys', journeyRoutes);
 app.use('/api/media', mediaRoutes);
+app.use('/api/incidents', incidentRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
