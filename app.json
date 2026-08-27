@@ -52,6 +52,12 @@
         {
           "photosPermission": "Homecoming uses your photo library so you can attach existing photos to an incident report."
         }
+      ],
+      [
+        "expo-sensors",
+        {
+          "motionPermission": "Homecoming uses motion data to detect a shake gesture for the emergency alert."
+        }
       ]
     ],
     "experiments": {
