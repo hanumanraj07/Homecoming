@@ -12,6 +12,7 @@ const QUICK_ACTIONS = [
   { icon: '🛡️', label: 'Guardians', href: '/guardians' },
   { icon: '🗺️', label: 'Map', href: '/map' },
   { icon: '📞', label: 'Fake call', href: '/fake-call' },
+  { icon: '📷', label: 'Camera', href: '/camera' },
 ];
 
 const STATUS_LABEL = { active: 'Active', completed: 'Completed', missed: 'Missed', sos: 'SOS' };
