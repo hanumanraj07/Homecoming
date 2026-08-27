@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 import { AuthProvider } from '../context/AuthContext';
 import { ThemeProvider, useTheme } from '../context/ThemeContext';
 import { ToastProvider } from '../context/ToastContext';
@@ -10,12 +11,14 @@ function RootStack() {
   return (
     <>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: colors.background },
-        }}
-      />
+      <ErrorBoundary>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: colors.background },
+          }}
+        />
+      </ErrorBoundary>
     </>
   );
 }
