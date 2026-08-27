@@ -18,7 +18,9 @@ export async function uploadMedia({ uri, type, onProgress }) {
   });
 
   const { data } = await api.post('/media', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
+    // Deliberately no Content-Type header here — React Native's networking layer computes the
+    // multipart boundary itself from the FormData instance. Setting "multipart/form-data"
+    // manually (without a boundary) overrides that and can produce a body the server can't parse.
     onUploadProgress: (event) => {
       if (!onProgress || !event.total) return;
       onProgress(event.loaded / event.total);
