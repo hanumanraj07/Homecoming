@@ -494,12 +494,97 @@ shake-to-alert, panic hold animation.
   phone and confirm the same flow fires; trigger the fake call and confirm
   ringtone + vibration actually play and stop correctly on answer/decline.
 
-## Next step
+### Session 3C — Final pass (complete)
 
-**Session 3C**: Final pass — bug-fix sweep, error boundary, offline handling,
-app icon and splash, README with setup instructions/architecture
-notes/screenshots and the scope-decisions section, final cleanup. Per the
-compressed 3-day plan this is also the last session — coverage of the
-feature checklist has been the priority throughout, and everything in it now
-has at least a working implementation. This session tightens loose ends
-rather than adding anything new.
+This was run back-to-back with sessions 3A/3B/3C after you told me to complete
+the project autonomously without stopping to ask before each session or each
+push — noted here since it breaks from the "one phase per session" pacing the
+brief originally asked for. No scope was skipped as a result; if anything,
+running straight through gave more room for the bug-fix sweep below.
+
+- **Bug-fix sweep found and fixed two real issues** before they'd have hit you
+  on a device:
+  1. `app/camera.jsx`: `CameraView`'s `mode` prop was being flipped to
+     `'video'` via `setState` *immediately before* the `recordAsync()` call
+     that needs it — but that state update hadn't committed to the native
+     view yet at that point, so recording likely started while the camera
+     was still configured for stills. Fixed by switching mode eagerly on
+     press-in (`onCapturePressIn`, wired through `CaptureControls`), well
+     before the long-press threshold resolves, giving the native side the
+     full delay to reconfigure.
+  2. `services/media.js`: the upload request manually set
+     `Content-Type: multipart/form-data` with no boundary, which can
+     override React Native's automatic boundary computation for `FormData`
+     bodies and produce a request the server can't parse. Removed the
+     header override — this is exactly the kind of thing curl-testing
+     against the backend couldn't have caught, since curl sets its own
+     correct multipart header regardless of what the app code does.
+  Also reconsidered `ErrorBoundary`'s placement mid-build: it wraps just the
+  navigator, inside the Theme/Toast/Auth providers, not the whole app —
+  wrapping everything would mean "Try again" on a crash also wiped the
+  logged-in session and theme, which is worse than the crash.
+- `components/ErrorBoundary.jsx`: class component (required for
+  `getDerivedStateFromError`/`componentDidCatch` — no hook equivalent),
+  fallback screen with a retry button, hardcoded colors since it must
+  render even if the crash originated inside `ThemeProvider`.
+- **App icon and splash**: generated from scratch — a compass mark (matching
+  the app's own 🧭 identity used throughout the UI) on the brand blue,
+  produced by a ~150-line local script writing raw PNG bytes (IHDR/IDAT/
+  IEND chunks, zlib deflate, hand-rolled CRC32) since no image tooling
+  (ImageMagick, sharp, PIL) was available in this sandbox and there was no
+  existing icon asset to start from. Covers the iOS icon, all three Android
+  adaptive-icon layers (foreground/background/monochrome), and the web
+  favicon. Installed `expo-splash-screen` and configured light/dark
+  background variants with the same mark.
+- **Offline handling**: interpreted narrowly, matching scope — "offline
+  queue" (queuing actions taken while offline for later sync) is explicitly
+  cut per the compressed plan's own cut list. What exists is what every
+  screen already had: a failed request lands in that screen's existing
+  error/retry state. No new offline-specific code was added; this is a
+  scope interpretation worth double-checking against what you actually
+  wanted here.
+- **README rewritten** end to end: feature coverage table, full setup for
+  both app and server (env vars, the `EXPO_PUBLIC_API_URL` cases, the
+  Android Google Maps key requirement), architecture notes, every scope
+  decision made across all ten sessions in one place (including the two
+  dependency deviations and — the most important one to read — the missing
+  guardian-notification gap), and an honest testing section.
+- **No screenshots in the README.** The checklist asks for them; I have no
+  device or simulator in this sandbox to produce real ones, and generating
+  fake screenshots of a safety app would be actively misleading. Flagging
+  the omission rather than filling it with something fabricated — add real
+  ones after the first device run.
+- Final validation: `npx expo export` for **both** `--platform ios` and
+  `--platform android` (clean, 1620 and 1713 modules respectively, zero
+  errors — this is the first session that checked Android specifically, not
+  just iOS), `expo prebuild` regenerating native projects cleanly, and a
+  full route-by-route curl sweep of the backend (health check, every
+  protected route rejecting a missing token, register/login validation, 404
+  handling) all passing.
+
+### The one thing most worth reading before you do anything else
+
+**Guardians never actually get notified of anything.** The product pitch —
+and the UI's own language in places — implies that starting a journey shares
+it with your guardians and that missing a check-in alerts them. Neither is
+true in this build: there's no push notification, SMS, or any other channel
+that reaches a guardian's phone. A missed deadline just turns the countdown
+red on *your own* dashboard. `expo-notifications` was on the approved stack
+but nothing in the 3-day checklist's line items actually specified building
+guardian-facing notifications, so it was never implemented. This is flagged
+in the README's scope-decisions section too, but it's the single biggest gap
+between what this app appears to do and what it actually does — read it
+there for the full context before demoing or relying on this.
+
+## Overall status
+
+Every item in the original feature checklist (Camera, Location, Contacts,
+Media, Backend, Expo Router, UI/UX) has a working implementation as of this
+session. Nothing has been run on a real device or against a live MongoDB —
+every session's validation was static bundling (`expo export`) plus curl
+against the backend, which caught two real bugs (the auth-middleware
+DB-error-masking bug in session 2B, and the two bugs in this session) but
+cannot substitute for actually running the app. The next step, whenever you
+pick this back up, is exactly what's in the README's Testing section: point
+`MONGO_URI` at a live database, run the app on a real device or simulator,
+and walk through register → journey → panic button → fake call end to end.
