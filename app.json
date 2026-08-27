@@ -33,6 +33,12 @@
         {
           "contactsPermission": "Homecoming uses your contacts to help you choose guardians for your journeys."
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Homecoming uses your location to track your journey and share it with your guardians while the app is open."
+        }
       ]
     ],
     "experiments": {
