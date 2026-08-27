@@ -261,10 +261,43 @@ shake-to-alert, panic hold animation.
   check on a real device: permission-denied state, search/multi-select import,
   manual add/edit/delete, and call/WhatsApp buttons.
 
+### Session 2C — Location and maps (complete)
+
+- `hooks/useLocation.js`: requests foreground permission, reads last-known
+  position immediately then current position, optionally watches position
+  (`{ watch: true }` — for journey tracking in session 2D), cleans up the
+  `watchPositionAsync` subscription in the `useEffect` return. Exposes
+  `status/location/error/isLoading`.
+- `app/(app)/map.jsx`: full loading/permission-denied/error/success states.
+  Shows the user's live position (`showsUserLocation`), a destination search
+  bar (`Location.geocodeAsync`) that drops a marker and reverse-geocodes it
+  into a readable address card, and a recenter FAB
+  (`mapRef.animateToRegion`).
+- Installed `expo-location` and `react-native-maps`, added the location
+  permission plugin config to `app.json`, re-ran `expo prebuild`.
+- Validated with `npx expo export --platform ios` (clean bundle, 1200
+  modules, zero errors).
+
+### Known issue / limitation
+
+- **Android needs a Google Maps API key that isn't set anywhere.**
+  `react-native-maps` uses Apple Maps on iOS out of the box — no key needed,
+  nothing to do there. On Android it needs a key from Google Cloud Console
+  added to `app.json` as `expo.android.config.googleMaps.apiKey`, then
+  `expo prebuild` re-run. Without it, the Android map screen will mount but
+  show blank/greyed tiles. I didn't fabricate a placeholder key. **Do this
+  before testing the map on Android.**
+- Same sandbox limitation as every session so far: no device to actually see
+  the map render, drop a pin, or watch permission prompts — validated by
+  clean static bundling only. First things to check on a real device:
+  permission-denied state, current-location marker, destination search, and
+  the recenter button.
+
 ## Next step
 
-**Session 2C**: Location and maps — permission handling, current + last known
-position, map screen with markers (`react-native-maps`, not installed yet),
-recenter button, reverse geocoding, destination search, `useLocation` hook
-with correct cleanup in the `useEffect` return (no background location — that
-scope decision is already documented in the README).
+**Session 2D**: Journeys — `Journey` model and routes on the server (not
+built yet), create-journey flow, live tracking screen with an animated bottom
+sheet, path polyline, countdown timer, check-in, journey history with
+pull-to-refresh, dynamic `/journey/[id]`. This is the session that finally
+uses `useLocation({ watch: true })` for real. Note: pagination is cut from
+scope, so journey history is a plain list, not paginated.
