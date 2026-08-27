@@ -90,10 +90,64 @@ shake-to-alert, panic hold animation.
   a quick look on a real device once you're on Session 1D or later and actually
   navigating between real screens.
 
+### Session 1C — Backend core (complete)
+
+- `server/src/config/db.js`: `connectDB()` wraps `mongoose.connect` with a 5s
+  server-selection timeout so failures surface fast instead of hanging requests.
+- `server/src/models/User.js`: matches the data model spec exactly — name,
+  email (unique), phone, passwordHash (select: false), avatarUrl, createdAt.
+  `toJSON` strips `passwordHash`/`__v`.
+- `server/src/utils/jwt.js` (sign/verify) and `server/src/utils/ApiError.js`
+  (status-coded error class).
+- `server/src/validators/auth.validators.js` + `middleware/validate.middleware.js`:
+  express-validator chains for register/login, formatted into a 422 response.
+- `server/src/middleware/auth.middleware.js`: `protect()` — Bearer token → verify
+  → load user → `req.user`, or a 401 for missing/malformed/expired/invalid
+  tokens or a deleted user.
+- `server/src/middleware/error.middleware.js`: `notFound` (404) +
+  `errorHandler` (normalizes Mongoose validation/cast/duplicate-key errors,
+  only logs to console on 500s).
+- `server/src/controllers/auth.controller.js` + `routes/auth.routes.js`:
+  `POST /api/auth/register` (bcrypt hash + create), `POST /api/auth/login`
+  (bcrypt compare + issue JWT), `GET /api/auth/me` (protected, exercises the
+  auth middleware).
+- `server/src/app.js` / `index.js`: Express app wired up with `express.json()`,
+  `/health`, the auth routes, and the error handlers last. The HTTP server now
+  starts listening immediately and connects to MongoDB in parallel (logged,
+  not blocking) rather than gating startup on the DB connection — this also
+  means `/health` and validation responses work even if Mongo is briefly down.
+- Installed `express`, `mongoose`, `jsonwebtoken`, `bcrypt`, `express-validator`,
+  `dotenv`. `bcrypt` (native, not `bcryptjs`) compiled/loaded fine — sandbox has
+  a working C++ toolchain and bcrypt ships prebuilt binaries anyway.
+- `.env.example` added (`PORT`, `MONGO_URI`, `JWT_SECRET`, `JWT_EXPIRES_IN`).
+
+### Known issue / limitation
+
+- **No MongoDB was reachable in this sandbox** — no local `mongod`, no package
+  available via `apt`, `mongodb.org`/`fastdl.mongodb.org` blocked by the sandbox's
+  proxy policy (403), and no Docker daemon running to pull an image. So: every
+  route was tested end-to-end with curl (see below) except the actual
+  DB-backed success path.
+  - Tested and confirmed correct: `GET /health` (200), unmatched route (404),
+    register validation errors (422, all four fields), login validation errors
+    (422), `GET /api/auth/me` with no token (401) and a garbage token (401).
+  - Tested with a valid register payload against the unreachable DB: the
+    request does **not** crash the server — it returns a clean `500` once
+    Mongoose's operation buffering times out (~10s), and the connection error
+    is logged server-side, not leaked to the client. This confirms the
+    middleware chain, validation, and error handling all work correctly; it
+    does not confirm an actual successful write/read against a live database.
+  - **First thing to do before Session 1D**: point `MONGO_URI` (in `server/.env`,
+    gitignored, not committed) at a real MongoDB — Atlas free tier or a local
+    `mongod` — and re-run the register → login → `/me` sequence with curl to
+    confirm an actual document gets created and read back correctly.
+
 ## Next step
 
-**Session 1C**: Express + MongoDB backend — server setup, `User` model,
-register/login routes, bcrypt password hashing, JWT auth middleware, input
-validation (express-validator), centralized error handler, `.env.example`. Test
-every route with curl before committing. This is server-only work; the
-`server/` package scaffolded in 1A still has no dependencies installed.
+**Session 1D**: Auth flow (frontend) — login and register screens with full
+form validation and inline errors (using the `Input`/`Button` components from
+1B), `AuthContext`, SecureStore token storage, an axios interceptor with 401
+handling, the protected `(app)` route group, `router.replace()` after login,
+and logout with a confirm dialog (`ConfirmDialog` from 1B). Needs
+`services/api.js` (axios instance) and `constants/config.js` (API base URL) —
+neither exists yet.
