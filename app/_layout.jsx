@@ -2,6 +2,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider } from '../context/AuthContext';
 import { ThemeProvider, useTheme } from '../context/ThemeContext';
+import { ToastProvider } from '../context/ToastContext';
 
 function RootStack() {
   const { colors, scheme } = useTheme();
@@ -22,9 +23,11 @@ function RootStack() {
 export default function RootLayout() {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <RootStack />
-      </AuthProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <RootStack />
+        </AuthProvider>
+      </ToastProvider>
     </ThemeProvider>
   );
 }
