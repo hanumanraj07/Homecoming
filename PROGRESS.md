@@ -293,11 +293,75 @@ shake-to-alert, panic hold animation.
   permission-denied state, current-location marker, destination search, and
   the recenter button.
 
+### Session 2D — Journeys (complete)
+
+- `server/src/models/Journey.js`: matches the data model spec exactly —
+  userId, guardianIds, status (active/completed/missed/sos), origin,
+  destination, currentLocation, path, expectedArrival, checkInDeadline,
+  startedAt, endedAt.
+- `server/src/{validators,controllers,routes}/journey.*`: protected, scoped
+  to `req.user._id`. `POST /api/journeys` verifies the chosen `guardianIds`
+  actually belong to the user and derives `checkInDeadline` as
+  `expectedArrival` + a 10-minute grace period (a judgment call — the two
+  fields are distinct in the data model, so I picked a sensible default
+  rather than making them identical; easy to change). `PATCH
+  /api/journeys/:id/location` and `POST /api/journeys/:id/check-in` both
+  reject a journey that isn't `active`. Mounted at `/api/journeys`.
+- `hooks/useCountdown.js`: ticks every second off a target date, cleans up
+  its interval in the `useEffect` return, returns an `mm:ss` label and
+  `isOverdue`.
+- `services/journeys.js`: list/get/create/updateLocation/checkIn.
+- `app/journey/new.jsx`: destination search (same `Location.geocodeAsync`
+  pattern as the map screen), guardian multi-select loaded from the backend
+  (empty state pointing at `/guardians` if none exist), and an "I'll be back
+  in" preset picker (15/30/45/60 min) instead of a raw date/time picker — no
+  date-picker library is in the approved dependency list, and the brief's own
+  wording ("I'll be back in 30 minutes") maps directly onto presets. Submits
+  current position as origin, POSTs the journey, replaces into
+  `/journey/[id]`.
+- `app/journey/[id].jsx`: full-screen map with origin/current/destination
+  markers and a path polyline. While active, `useLocation({ watch: true })`
+  feeds each position to `PATCH .../location` — the hook's 10s watch interval
+  is what satisfies the "PATCH every 10-15s" scope decision, no separate
+  timer needed. The polyline renders directly from the response's `path`, not
+  a separately-accumulated client array. A countdown and "Check in" button
+  sit in a bottom panel — **this is a static, non-draggable Card, not an
+  animated bottom sheet.** `react-native-reanimated` and a `Sheet` component
+  aren't installed/built yet (deferred to whenever session 3B needs
+  reanimated for the panic button); building a real gesture-driven sheet now
+  would mean adding that dependency a phase early for one screen. Checking in
+  flips the journey to `completed`, which stops the watch (the hook call is
+  gated on `isActive`). A non-active journey renders the same screen
+  read-only, without the timer/check-in.
+- `app/(app)/index.jsx`: dashboard now fetches journeys on mount and on
+  pull-to-refresh (`RefreshControl`). Shows a live active-journey card with
+  its own countdown when one exists, otherwise the existing empty state. A
+  "Recent journeys" list below shows past journeys with a status badge — a
+  plain list, not paginated (cut from scope).
+- Validated with `npx expo export --platform ios` (clean bundle, 1202
+  modules, zero errors) and a standalone check of the countdown
+  label-formatting logic.
+
+### Known issue / limitation
+
+- Same DB limitation as every backend session: journey routes were curl-
+  tested for the auth guard (401 with no token, confirmed clean 500 — not a
+  masked 401 — with a valid token against the unreachable DB) but the create
+  → track → check-in flow itself needs a live database and a real device to
+  exercise. First things to check on a real device, in order: create a
+  journey end to end, confirm the map shows moving position updates roughly
+  every 10s, confirm the polyline grows, confirm the countdown ticks and
+  turns red when overdue, confirm check-in stops location updates and flips
+  the dashboard card into journey history.
+- The bottom panel on the tracking screen is a static Card, not a draggable
+  animated sheet (see above) — a known, deliberate scope trim, not a bug.
+
 ## Next step
 
-**Session 2D**: Journeys — `Journey` model and routes on the server (not
-built yet), create-journey flow, live tracking screen with an animated bottom
-sheet, path polyline, countdown timer, check-in, journey history with
-pull-to-refresh, dynamic `/journey/[id]`. This is the session that finally
-uses `useLocation({ watch: true })` for real. Note: pagination is cut from
-scope, so journey history is a plain list, not paginated.
+**Session 3A**: Camera and media — camera screen with flip/torch/zoom/tap-to-
+focus, capture, preview, retake, video record start/stop with playback,
+gallery picker, compression, multipart upload with progress. Needs
+`expo-camera`, `expo-image-picker`, `expo-av`, and `multer` on the server —
+none of these are installed yet. This is also where the Phase 0 caution about
+`expo-camera` not working in Expo Go actually matters — the dev client set up
+in session 1A is what makes this possible.
