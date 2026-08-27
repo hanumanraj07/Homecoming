@@ -50,13 +50,50 @@ shake-to-alert, panic hold animation.
   `expo-system-ui` to fully take effect on Android. Not installed yet since it
   wasn't in the approved dependency list — revisit in Phase/Session 1B (theme).
 
+### Session 1B — Design system (complete)
+
+- `constants/theme.js`: light + dark color tokens, spacing scale (4/8/12/16/24/32),
+  typography scale (size/weight/lineHeight), border radii, and shadow presets (sm/md/lg).
+- `context/ThemeContext.jsx`: `ThemeProvider` + `useTheme()`. Mode is
+  `light` | `dark` | `system`, defaults to the device color scheme, persists the
+  user's explicit choice to AsyncStorage (`homecoming.themeMode`), exposes
+  `toggleTheme()` and `setThemeMode()`. Wired into `app/_layout.jsx` so the whole
+  app is inside the provider; status bar style and route background now follow
+  the resolved scheme.
+- `components/ui/` — all 9 spec'd components, all theme-driven (no hardcoded hex
+  or magic numbers), all consuming `useTheme()`: `Button` (primary/secondary/
+  danger/ghost, loading/disabled, 44pt min height), `Input` (label, error text,
+  icon slot), `Card`, `EmptyState` (icon/title/message/optional action — pairs
+  with `Linking.openSettings()` for permission-denied screens later), `Toast`
+  (self-dismissing, animated in/out), `ConfirmDialog` (modal, destructive
+  variant), `ListItem` (leading/trailing slots), `Badge` (5 variants, 2 sizes),
+  `FAB` (circular or extended, primary/danger). Barrel export at
+  `components/ui/index.js`.
+- No showcase screen was built (cut from this compressed scope) — instead the
+  full set was temporarily rendered on the home screen and validated with
+  `npx expo export --platform ios` (clean bundle, 1130 modules, zero errors),
+  then the home screen was reverted to its Phase-4 placeholder before committing.
+- Installed `@react-native-async-storage/async-storage`.
+
+### Known issue / limitation
+
+- Installing `@react-native-async-storage/async-storage` hit an ERESOLVE error
+  from `npm` — `expo-router@57`'s own web/dom tooling (`vaul` → `@radix-ui/*`)
+  pulls in `react-dom@19.2.8`, which wants `react@^19.2.8`, while the project
+  pins `react@19.2.3`. Worked around with `npm install --legacy-peer-deps`
+  (`npx expo install <pkg> -- --legacy-peer-deps`). This is an upstream
+  expo-router peer conflict, not something introduced by this project — any
+  future `npm install`/`expo install` in this repo may need the same flag until
+  expo-router's own dependency tree resolves it.
+- Same sandbox limitation as Session 1A: no device/simulator here, so components
+  were only verified to bundle correctly, not visually verified on-device. Worth
+  a quick look on a real device once you're on Session 1D or later and actually
+  navigating between real screens.
+
 ## Next step
 
-**Session 1B**: `constants/theme.js` (light + dark tokens, spacing, typography,
-radii, shadows), `ThemeContext` with persisted toggle, and the lean `ui/` library
-(Button, Input, Card, EmptyState, Toast, ConfirmDialog, ListItem, Badge, FAB — 9
-components, no showcase screen per the compressed scope).
-
-Before starting: run `npx expo run:ios` (or `run:android`) on a real machine to
-confirm the dev client actually launches — the sandbox could only verify the
-bundle compiles, not that it boots on device.
+**Session 1C**: Express + MongoDB backend — server setup, `User` model,
+register/login routes, bcrypt password hashing, JWT auth middleware, input
+validation (express-validator), centralized error handler, `.env.example`. Test
+every route with curl before committing. This is server-only work; the
+`server/` package scaffolded in 1A still has no dependencies installed.
