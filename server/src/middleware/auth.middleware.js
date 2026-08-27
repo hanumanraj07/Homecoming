@@ -10,17 +10,19 @@ async function protect(req, _res, next) {
     return next(new ApiError(401, 'Missing or malformed authorization header'));
   }
 
+  let payload;
   try {
-    const payload = verifyToken(token);
-    const user = await User.findById(payload.sub);
-    if (!user) {
-      return next(new ApiError(401, 'User no longer exists'));
-    }
-    req.user = user;
-    next();
+    payload = verifyToken(token);
   } catch {
-    next(new ApiError(401, 'Invalid or expired token'));
+    return next(new ApiError(401, 'Invalid or expired token'));
   }
+
+  const user = await User.findById(payload.sub);
+  if (!user) {
+    return next(new ApiError(401, 'User no longer exists'));
+  }
+  req.user = user;
+  next();
 }
 
 module.exports = { protect };
