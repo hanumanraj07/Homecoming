@@ -189,9 +189,37 @@ shake-to-alert, panic hold animation.
   or Android emulator you'll need to set it to your machine's LAN IP (or
   `10.0.2.2` for the Android emulator) in a local `.env`.
 
+### Session 2A — App shell (complete)
+
+- `context/ToastContext.jsx`: `ToastProvider` + `useToast()` →
+  `showToast(message, type)`. Renders the `Toast` UI component at the root
+  layout (above `AuthProvider`/the `Stack`), so a toast survives navigation
+  instead of unmounting with the screen that triggered it.
+- `app/(app)/_layout.jsx`: tabs now themed (active/inactive tint, background,
+  border all from `useTheme()`) — still the navigator's default tab bar, no
+  custom animation (cut from scope).
+- `app/(app)/index.jsx`: home dashboard — greeting, a "No active journey"
+  `EmptyState` with a "Start a journey" action (there's no journey feature
+  yet, session 2D, so this is the honest empty state rather than mocked
+  journey data), and a 2x2 quick-action grid (new journey / guardians / map /
+  fake call).
+- `app/(app)/profile.jsx`: initials avatar, name/email header, email/phone as
+  list rows in a `Card`, logout now fires a success toast before redirecting
+  to `/login` — a real demonstration that `ToastProvider` renders above
+  whatever screen is currently active.
+- Validated with `npx expo export --platform ios` (clean bundle, 1143
+  modules, zero errors).
+
+### Known issue / limitation
+
+- Same as 1C/1D: no live MongoDB in this sandbox, so `user.name`/`user.phone`
+  rendering on the dashboard/profile could only be verified against the
+  API's response shape, not against a real logged-in session on a device.
+
 ## Next step
 
-**Session 2A**: Tab navigator (default styling — no custom tab bar animation,
-that's cut from scope), home dashboard, profile screen refinements, empty
-states, `ToastProvider` (the `Toast` UI component exists from 1B, but nothing
-renders/queues it globally yet).
+**Session 2B**: Contacts and guardians — permission flow with a denied state
+(`EmptyState` + `Linking.openSettings()`), contact import with search and
+multi-select (`expo-contacts`), guardian CRUD against the backend (needs a
+`Guardian` model + routes on the server — not built yet), add/edit/delete
+contact, tap-to-call and WhatsApp via `Linking`.
