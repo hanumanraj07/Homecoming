@@ -142,12 +142,56 @@ shake-to-alert, panic hold animation.
     `mongod` — and re-run the register → login → `/me` sequence with curl to
     confirm an actual document gets created and read back correctly.
 
+### Session 1D — Auth flow, frontend (complete)
+
+- `constants/config.js`: `API_BASE_URL` from `EXPO_PUBLIC_API_URL`, falling
+  back to `http://localhost:4000/api`. Root `.env.example` documents it — for
+  a real device you'll need your machine's LAN IP, not `localhost`.
+- `services/api.js`: axios instance. Request interceptor attaches the
+  SecureStore token as `Authorization: Bearer`. Response interceptor calls a
+  registered "unauthorized" handler on a 401 **only when the failing request
+  already carried an auth header** — so a wrong-password 401 on `/login`
+  itself doesn't trigger a global logout, only an expired/invalid token on an
+  authenticated request does.
+- `utils/validation.js`: `isValidEmail`/`isValidPassword`, shared by both
+  screens.
+- `context/AuthContext.jsx`: on mount, loads any stored token and validates it
+  against `GET /auth/me`; exposes `login`, `register`, `logout`,
+  `isAuthenticated`, `isLoading`; registers itself as `services/api.js`'s
+  unauthorized handler so a 401 anywhere clears the session automatically.
+  Wired into `app/_layout.jsx` alongside `ThemeProvider`.
+- `app/(app)/_layout.jsx`: now an auth guard — spinner while checking the
+  stored session, `<Redirect href="/login" />` if unauthenticated, otherwise
+  the tab navigator.
+- `app/(auth)/login.jsx` and `register.jsx`: full inline validation (email
+  format, required fields, password length, password-match on register),
+  loading state on submit, server error message surfaced on failure,
+  `router.replace('/')` on success so the auth guard takes over immediately.
+- `app/(app)/profile.jsx`: shows the signed-in user, a destructive
+  `ConfirmDialog`-gated "Log out" button, clears the session and
+  `router.replace('/login')`.
+- Installed `axios` and `expo-secure-store`.
+- Validated with `npx expo export --platform ios` (clean bundle, 1142
+  modules, zero errors) and a plain-Node check of the validation helpers.
+
+### Known issue / limitation
+
+- Same as Session 1C: **no live MongoDB in this sandbox**, so the full
+  register → land on tabs → log out → log back in loop could not be run
+  end-to-end here. The code path was validated by static bundling and by
+  reading the request/response contract against the exact shape the backend
+  returns (`{ token, user }`), but not exercised on a real device against a
+  real database. This is the top priority to check before Session 2A: run the
+  dev client against a real Mongo and walk through register → dashboard →
+  profile → log out → log in.
+- `EXPO_PUBLIC_API_URL` defaults to `http://localhost:4000/api`, which only
+  works from a simulator on the same machine as the API. On a physical device
+  or Android emulator you'll need to set it to your machine's LAN IP (or
+  `10.0.2.2` for the Android emulator) in a local `.env`.
+
 ## Next step
 
-**Session 1D**: Auth flow (frontend) — login and register screens with full
-form validation and inline errors (using the `Input`/`Button` components from
-1B), `AuthContext`, SecureStore token storage, an axios interceptor with 401
-handling, the protected `(app)` route group, `router.replace()` after login,
-and logout with a confirm dialog (`ConfirmDialog` from 1B). Needs
-`services/api.js` (axios instance) and `constants/config.js` (API base URL) —
-neither exists yet.
+**Session 2A**: Tab navigator (default styling — no custom tab bar animation,
+that's cut from scope), home dashboard, profile screen refinements, empty
+states, `ToastProvider` (the `Toast` UI component exists from 1B, but nothing
+renders/queues it globally yet).
