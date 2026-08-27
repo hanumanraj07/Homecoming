@@ -18,9 +18,16 @@ export default function CameraScreen() {
   const cameraRef = useRef(null);
 
   const [isRecording, setIsRecording] = useState(false);
+  // CameraView needs `mode="video"` applied *before* recordAsync() is called, but a plain
+  // setState right before the imperative call won't have committed to the native view yet.
+  // Switching eagerly on press-in (well before the long-press threshold fires) gives React
+  // time to re-render and the native side time to reconfigure before recording actually starts.
+  const [cameraMode, setCameraMode] = useState('picture');
   const [capturedMedia, setCapturedMedia] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+
+  const handlePressIn = () => setCameraMode('video');
 
   const takePhoto = async () => {
     if (!cameraRef.current || isRecording) return;
@@ -29,6 +36,8 @@ export default function CameraScreen() {
       setCapturedMedia({ uri: photo.uri, type: 'photo' });
     } catch {
       showToast('Could not capture photo', 'error');
+    } finally {
+      setCameraMode('picture');
     }
   };
 
@@ -44,6 +53,7 @@ export default function CameraScreen() {
       showToast('Could not record video', 'error');
     } finally {
       setIsRecording(false);
+      setCameraMode('picture');
     }
   };
 
@@ -137,7 +147,7 @@ export default function CameraScreen() {
         facing={camera.facing}
         enableTorch={camera.torchOn}
         zoom={camera.zoom}
-        mode={isRecording ? 'video' : 'picture'}
+        mode={cameraMode}
       />
       <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0 }}>
         <CaptureControls
@@ -149,6 +159,7 @@ export default function CameraScreen() {
           onZoomIn={() => camera.adjustZoom(0.1)}
           onZoomOut={() => camera.adjustZoom(-0.1)}
           isRecording={isRecording}
+          onCapturePressIn={handlePressIn}
           onCapturePress={takePhoto}
           onCaptureLongPress={startRecording}
           onCaptureRelease={stopRecording}

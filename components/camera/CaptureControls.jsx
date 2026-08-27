@@ -10,6 +10,7 @@ export function CaptureControls({
   onZoomIn,
   onZoomOut,
   isRecording,
+  onCapturePressIn,
   onCapturePress,
   onCaptureLongPress,
   onCaptureRelease,
@@ -37,6 +38,7 @@ export function CaptureControls({
 
       <View style={{ alignItems: 'center' }}>
         <Pressable
+          onPressIn={onCapturePressIn}
           onPress={onCapturePress}
           onLongPress={onCaptureLongPress}
           onPressOut={onCaptureRelease}
