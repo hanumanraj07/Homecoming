@@ -1,6 +1,7 @@
 const express = require('express');
 const authRoutes = require('./routes/auth.routes');
 const guardianRoutes = require('./routes/guardian.routes');
+const journeyRoutes = require('./routes/journey.routes');
 const { notFound, errorHandler } = require('./middleware/error.middleware');
 
 const app = express();
@@ -11,6 +12,7 @@ app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/guardians', guardianRoutes);
+app.use('/api/journeys', journeyRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
