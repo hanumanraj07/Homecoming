@@ -81,11 +81,22 @@ npx expo prebuild
 npx expo run:ios       # or: npx expo run:android
 ```
 
-This app uses native modules (camera, contacts, sensors) that don't work reliably
-in Expo Go, so it runs on a development build rather than Expo Go. `expo prebuild`
-generates the native `ios/`/`android/` projects (gitignored, regenerated on demand)
-— re-run it any time you add a native dependency or change permission strings in
-`app.json`.
+This app uses native modules (camera, contacts, sensors) that historically haven't
+worked reliably in Expo Go — specifically video recording — which is why it's set
+up for a development build by default. `expo prebuild` generates the native
+`ios`/`android` projects (gitignored, regenerated on demand) — re-run it any time
+you add a native dependency or change permission strings in `app.json`.
+
+**Just want to try it fast, no Xcode/Android Studio?** Run `npx expo start`
+instead of the prebuild/run commands above and scan the QR code with Expo Go
+(press `s` in the terminal first if it defaults to development-build mode). The
+project targets **Expo SDK 54** specifically so it matches what Expo Go actually
+ships — check your installed Expo Go version if you've bumped `expo` or any
+`expo-*`/`react-native-*` package and things stop loading. Photo capture, contacts,
+location, sensors, and the panic button have been verified to bundle correctly on
+SDK 54; video recording is the one feature most likely to be flaky in Expo Go
+specifically — the dev-client build above is the fully reliable path if that's an
+issue.
 
 `EXPO_PUBLIC_API_URL` needs to point at wherever the backend above is actually
 reachable from your device or simulator:

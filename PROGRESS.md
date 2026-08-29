@@ -644,18 +644,56 @@ the reason above; cloning the repo and building with a manually-created
 `mongod` — that's the normal path for anyone not stuck in a sandbox with
 this particular set of network restrictions.
 
+## Downgraded from Expo SDK 57 to SDK 54
+
+The user tried running the app in Expo Go on their iPhone and hit `Project
+is incompatible with this version of Expo Go` — their installed Expo Go
+(capped at SDK 54 by what the App Store offers for their iOS version) can't
+run an SDK 57 project, and Expo Go only ever runs the exact SDK it was built
+for, so "update Expo Go" wasn't actually available as a fix here. Rather
+than push them toward EAS Build + a paid Apple Developer account just to
+test on-device, downgraded the whole project to SDK 54 instead, since that's
+what their Expo Go actually supports — free, works today, no dev client or
+Xcode needed at all.
+
+**What changed**: `expo@54.0.37` and, via `npx expo install --fix`, every
+`expo-*` package, `react`, `react-native`, `react-native-maps`,
+`react-native-reanimated`, `react-native-worklets`, `react-native-gesture-
+handler`, `react-native-screens`, and `react-native-safe-area-context` down
+to their SDK 54-compatible versions — 3 major SDK versions back. `react-
+native-reanimated` stayed on v4 (`~4.1.1` instead of `4.5.1`) — it turned
+out v4's worklets-based architecture already existed at SDK 54, so unlike
+the concern raised when this was planned, no reanimated v3 migration or
+babel-config change was needed.
+
+**Verification, since this touched nearly every native dependency in the
+project**: before committing, checked the actual type declarations for
+every native API this app calls — `expo-camera`'s `CameraView` props
+(`mode`, `enableTorch`, `zoom`, `facing`) and methods
+(`takePictureAsync`/`recordAsync`/`stopRecording`), `useCameraPermissions`/
+`useMicrophonePermissions`, `expo-location`'s permission/position/geocoding
+functions, `expo-contacts`' `getContactsAsync`, `expo-sensors`'
+`Accelerometer.addListener`, `expo-image-picker`'s
+`launchImageLibraryAsync`, and `expo-av`'s `Video`/`ResizeMode` exports —
+against the SDK 54 versions actually installed, not assumed compatible.
+Every one matched exactly what the code already calls. Then a clean
+`rm -rf node_modules && npm install` and `npx expo export` for **both**
+`--platform ios` and `--platform android` (1418 and 1414 modules, zero
+errors on each) and `expo prebuild` all passed.
+
+**Not yet known**: static bundling and type-signature checks can't catch
+everything a genuine SDK downgrade might affect — subtle runtime behavior
+differences, native module version quirks that don't show up until actual
+device execution, that kind of thing. This is real risk that only
+disappears once it's actually been run. This is exactly what's being tested
+right now, live, with the user on their iPhone via Expo Go — see the
+conversation for how it went, since that's more current than this file.
+
 ## Overall status
 
 Every item in the original feature checklist (Camera, Location, Contacts,
 Media, Backend, Expo Router, UI/UX) has a working implementation. The
-backend is now verified end-to-end against a real database (see above) —
-every route, every guard clause, every edge case tested passed. What
-remains unverified is the mobile app itself: nothing in this repo has run
-on a real device or simulator, so anything specific to React Native/Expo
-runtime behavior — actual camera capture, GPS permission prompts, the
-reanimated panic button animation, push notification-style UX, general
-on-device feel — is still exactly as uncertain as every prior session's
-notes describe. The next step is running the app itself: `EXPO_PUBLIC_API_URL`
-pointed at a reachable backend (real MongoDB now optional — Atlas, local
-`mongod`, or the FerretDB approach above all work), on a real device or
-simulator, walking through register → journey → panic button → fake call.
+backend is verified end-to-end against a real database (see above) — every
+route, every guard clause, every edge case tested passed. The app itself is
+now on Expo SDK 54 (downgraded from 57, see above) specifically to run in
+the user's Expo Go — that on-device test is in progress as of this note.
