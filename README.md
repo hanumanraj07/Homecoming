@@ -12,9 +12,11 @@ offers a quiet way out of an uncomfortable situation.
 ## Status
 
 Feature-complete for the 3-day build plan in `PROGRESS.md` — every checklist item
-below has a working implementation. Nothing in this repo has been run on a real
-device or against a live database; see **Testing** below before you trust it with
-real safety-critical use.
+below has a working implementation. The backend has since been verified
+end-to-end against a real MongoDB-wire-protocol database (every route, every
+guard clause, cross-user data isolation — see **Testing**). The mobile app
+itself has still never run on a real device or simulator; see **Testing**
+before you trust this with real safety-critical use.
 
 ## Feature coverage
 
@@ -164,24 +166,39 @@ oversights:
 
 ## Testing
 
-Every session's work was validated with `npx expo export --platform ios` (a clean
-static Metro bundle — confirms every file imports and compiles correctly) and,
-where possible, curl against the running backend. Neither of those substitutes for
-running the app. Specifically **not yet verified on a real device or against a live
-database**:
+### Backend: verified end-to-end against a real database
 
-- Register → login → dashboard → logout, end to end
+Every route in the API has been exercised against a real, live
+MongoDB-wire-protocol database (FerretDB, SQLite-backed — see `PROGRESS.md`
+for why and how, if you're curious) and passed: register/login including
+wrong-password and duplicate-email cases, guardian CRUD with the
+primary-first sort, journey creation with the guardian-ownership and
+future-date validation, location updates with real path accumulation,
+check-in and its idempotency guard, a real multipart file upload fetched
+back byte-identical, incident creation linked to a journey and to the
+uploaded photo, and — importantly — confirmed that a second user genuinely
+cannot see the first user's data (404, not a leak). No new bugs turned up in
+this pass. Point `MONGO_URI` at any real MongoDB (Atlas, local `mongod`, or
+the FerretDB approach in `PROGRESS.md`) and the backend should behave
+exactly as tested.
+
+### App: still not run on a real device or simulator
+
+Every session's frontend work was validated with `npx expo export` (a clean
+static Metro bundle for both iOS and Android — confirms every file imports
+and compiles correctly), which is real but limited: it can't catch anything
+that only shows up at runtime. Specifically **not yet verified**:
+
+- Register → login → dashboard → logout, end to end, in the actual app
 - Creating a journey and watching the map update as you move
-- The full panic → photo → upload → incident round trip
+- The full panic → photo → upload → incident round trip, on-device
 - Contact import, permission-denied states, and camera/gallery on an actual device
 - Fake call ringtone/vibration actually playing and stopping correctly
 - Shake detection sensitivity
+- The reanimated panic-button fill animation and haptic ramp actually feeling right
 
-A backend bug *was* caught and fixed this way: the auth middleware was masking
-database connection failures as "invalid token" 401s instead of the real error —
-found by curl-testing against this sandbox's intentionally-unreachable MongoDB
-(see `PROGRESS.md`, session 2B, for the full story).
-
-The first real test pass — point `MONGO_URI` at a live database, run the app on a
-device or simulator, and walk through register → journey → panic button → fake
-call — is the natural next step before treating this as done.
+Two bugs *were* caught this way despite no device: a camera mode-switch race
+condition and a multipart upload header override (session 3C) — found by
+reading the code adversarially and reasoning about React Native's actual
+runtime behavior, not by running it. That's a real limit of this kind of
+review; it's not a substitute for the on-device pass above.
