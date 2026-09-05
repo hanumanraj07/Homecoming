@@ -9,6 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { useAuth } from '../../../context/AuthContext';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SunHillsBanner } from '../../../components/Illustrations';
 import { HamburgerMenu } from '../../../components/HamburgerMenu';
@@ -16,6 +17,7 @@ import { COLORS, FONTS, RADIUS, SPACING } from '../../../theme/colors';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
+  const router = useRouter();
 
   const handleLogout = () => {
     Alert.alert(
@@ -34,11 +36,11 @@ export default function ProfileScreen() {
     { icon: 'call-outline', label: 'Phone', value: user?.phone },
   ];
 
-  const menuItems = [
-    { icon: 'notifications-outline', label: 'Notifications', color: COLORS.primary },
-    { icon: 'shield-outline', label: 'Privacy & Security', color: COLORS.success },
-    { icon: 'help-circle-outline', label: 'Help & Support', color: COLORS.warning },
-    { icon: 'information-circle-outline', label: 'About Homecoming', color: COLORS.textSecondary },
+  const menuItems: { icon: keyof typeof Ionicons.glyphMap; label: string; color: string; route: string }[] = [
+    { icon: 'notifications-outline', label: 'Notifications', color: COLORS.primary, route: '/(app)/notifications' },
+    { icon: 'shield-outline', label: 'Privacy & Security', color: COLORS.success, route: '/(app)/privacy' },
+    { icon: 'help-circle-outline', label: 'Help & Support', color: COLORS.warning, route: '/(app)/help' },
+    { icon: 'information-circle-outline', label: 'About Homecoming', color: COLORS.textSecondary, route: '/(app)/about' },
   ];
 
   return (
@@ -64,7 +66,13 @@ export default function ProfileScreen() {
         </View>
 
         {/* Profile Info */}
-        <Text style={styles.sectionLabel}>Account Details</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionLabel}>Account Details</Text>
+          <TouchableOpacity style={styles.editLink} onPress={() => router.push('/(app)/edit-profile')} hitSlop={8}>
+            <Ionicons name="pencil-outline" size={14} color={COLORS.primary} />
+            <Text style={styles.editLinkText}>Edit</Text>
+          </TouchableOpacity>
+        </View>
         <View style={styles.card}>
           {profileFields.map((field, index) => (
             <View key={field.label} style={[styles.infoRow, index < profileFields.length - 1 && styles.infoRowBorder]}>
@@ -86,9 +94,10 @@ export default function ProfileScreen() {
             <TouchableOpacity
               key={item.label}
               style={[styles.menuRow, index < menuItems.length - 1 && styles.infoRowBorder]}
+              onPress={() => router.push(item.route as any)}
             >
               <View style={[styles.menuIconWrapper, { backgroundColor: item.color + '22' }]}>
-                <Ionicons name={item.icon as any} size={20} color={item.color} />
+                <Ionicons name={item.icon} size={20} color={item.color} />
               </View>
               <Text style={styles.menuLabel}>{item.label}</Text>
               <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} />
@@ -157,6 +166,22 @@ const styles = StyleSheet.create({
   displayEmail: {
     fontSize: 14,
     color: COLORS.textSecondary,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  editLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: SPACING.sm,
+  },
+  editLinkText: {
+    fontSize: 12,
+    fontWeight: FONTS.semiBold,
+    color: COLORS.primary,
   },
   sectionLabel: {
     fontSize: 12,

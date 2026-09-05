@@ -32,7 +32,38 @@ export async function searchPlacesByText(query: string): Promise<PlaceSuggestion
 
 // Overpass is OpenStreetMap's free query API for map data — used here to find named,
 // notable spots (landmarks, parks, attractions) around the user, since Nominatim's search
-// endpoint only answers text queries, not "what's nearby."
+// endpoint only answers text queries, not "what's nearby." The public instance is shared and
+// rate-limits aggressively under load, occasionally answering with an HTML "too busy" page
+// instead of JSON — so this tries a couple of public mirrors and parses defensively rather than
+// assuming any single request succeeds.
+const OVERPASS_ENDPOINTS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+];
+
+async function queryOverpass(query: string): Promise<any> {
+  let lastError: unknown;
+  for (const endpoint of OVERPASS_ENDPOINTS) {
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: query,
+      });
+      const contentType = response.headers.get('content-type') || '';
+      if (!response.ok || !contentType.includes('json')) {
+        // A busy/rate-limited Overpass instance answers with an HTML page, not an HTTP error —
+        // catching that here (via content-type) avoids a raw JSON.parse crash on "<html>...".
+        throw new Error(`Overpass returned non-JSON response (status ${response.status})`);
+      }
+      return await response.json();
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError;
+}
+
 export async function fetchNearbyPlaces(
   center: { latitude: number; longitude: number },
   radiusMeters = 3000
@@ -40,12 +71,7 @@ export async function fetchNearbyPlaces(
   const query = `[out:json][timeout:15];(node["tourism"](around:${radiusMeters},${center.latitude},${center.longitude});node["historic"](around:${radiusMeters},${center.latitude},${center.longitude});node["leisure"="park"](around:${radiusMeters},${center.latitude},${center.longitude}););out body 30;`;
 
   try {
-    const response = await fetch('https://overpass-api.de/api/interpreter', {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: query,
-    });
-    const data = await response.json();
+    const data = await queryOverpass(query);
     const elements = Array.isArray(data?.elements) ? data.elements : [];
 
     const places: NearbyPlace[] = elements
@@ -66,7 +92,10 @@ export async function fetchNearbyPlaces(
 
     return places;
   } catch (err) {
-    console.error('Failed to fetch nearby places', err);
+    // Both mirrors failing is an anticipated flakiness of a free, shared, unauthenticated public
+    // API — not a bug — so this warns rather than escalating to console.error/LogBox. The Nearby
+    // tab already renders an empty-but-not-broken state for a zero-length result.
+    console.warn('Nearby places unavailable right now (Overpass API busy or rate-limited)', err);
     return [];
   }
 }

@@ -3,7 +3,7 @@
 // identically everywhere and stay crisp at any size.
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
-import Svg, { Circle, Path, Polygon, Rect, Ellipse, Line } from 'react-native-svg';
+import Svg, { Circle, Path, Polygon, Rect, Ellipse, Line, Defs, LinearGradient, RadialGradient, Stop } from 'react-native-svg';
 import { COLORS } from '../theme/colors';
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
@@ -47,13 +47,29 @@ export function HeroScene({ height = 320, showHouse = true }: { height?: number;
 export function SunHillsBanner({ height = 160 }: { height?: number }) {
   return (
     <Svg width="100%" height={height} viewBox="0 0 320 160" preserveAspectRatio="xMidYMax slice">
-      <Rect x={0} y={0} width={320} height={160} fill={COLORS.primaryLight} />
-      <Circle cx={250} cy={44} r={26} fill="#F5EAC2" />
-      <Polygon points="0,120 70,60 140,120" fill={COLORS.primary} opacity={0.6} />
-      <Polygon points="90,120 170,70 260,120" fill={COLORS.primary} opacity={0.6} />
-      <Path d="M0,130 Q80,100 160,125 T320,120 V160 H0 Z" fill={COLORS.primaryDark} />
-      <PineTree x={30} y={122} scale={0.8} />
-      <PineTree x={280} y={124} scale={0.9} />
+      <Defs>
+        <LinearGradient id="sunhills-sky" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#BCE3EF" />
+          <Stop offset="1" stopColor={COLORS.primaryLight} />
+        </LinearGradient>
+        <RadialGradient id="sunhills-glow" cx="50%" cy="50%" r="50%">
+          <Stop offset="0" stopColor="#FFF6DD" stopOpacity={0.6} />
+          <Stop offset="1" stopColor="#FFF6DD" stopOpacity={0} />
+        </RadialGradient>
+      </Defs>
+
+      <Rect x={0} y={0} width={320} height={160} fill="url(#sunhills-sky)" />
+      <Circle cx={250} cy={44} r={38} fill="url(#sunhills-glow)" />
+      <Circle cx={250} cy={44} r={21} fill="#FFF6DD" />
+
+      <Path d="M0,96 Q60,64 130,88 Q200,110 260,72 Q290,56 320,66 V160 H0 Z" fill={COLORS.primaryLight} opacity={0.9} />
+      <Path d="M0,114 Q80,88 160,108 Q230,126 320,100 V160 H0 Z" fill={COLORS.primary} opacity={0.9} />
+      <Path d="M0,132 Q90,112 170,128 Q240,142 320,122 V160 H0 Z" fill={COLORS.primaryDark} />
+
+      <PineTree x={30} y={130} scale={0.75} />
+      <PineTree x={54} y={140} scale={0.5} />
+      <PineTree x={280} y={132} scale={0.9} />
+      <PineTree x={302} y={142} scale={0.55} />
     </Svg>
   );
 }
@@ -145,7 +161,16 @@ export function PeopleEmptyState({ height = 150 }: { height?: number }) {
 // landing page (or any banner) motion without animating the illustration's geometry itself.
 // `height` scales the clouds' vertical position proportionally so this works on both the tall
 // Welcome hero and a short in-app banner strip.
-export function DriftingClouds({ width, height = 420 }: { width: number; height?: number }) {
+export function DriftingClouds({
+  width,
+  height = 420,
+  night = false,
+}: {
+  width: number;
+  height?: number;
+  /** Moonlit, muted clouds for a night sky instead of bright white daytime ones. */
+  night?: boolean;
+}) {
   const slow = useRef(new Animated.Value(0)).current;
   const fast = useRef(new Animated.Value(0)).current;
 
@@ -175,13 +200,16 @@ export function DriftingClouds({ width, height = 420 }: { width: number; height?
     value.interpolate({ inputRange: [0, 1], outputRange: [-120, width + 40] });
   const scale = height / 420;
 
+  const cloudColor = night ? '#4A5A72' : '#FFFFFF';
+  const cloudOpacity = night ? 0.55 : 0.9;
+
   return (
     <>
       <Animated.View style={[styles.cloud, { top: 64 * scale, transform: [{ translateX: track(slow) }] }]} pointerEvents="none">
-        <SingleCloud scale={scale} />
+        <SingleCloud scale={scale} color={cloudColor} opacity={cloudOpacity} />
       </Animated.View>
       <Animated.View style={[styles.cloud, { top: 132 * scale, transform: [{ translateX: track(fast) }] }]} pointerEvents="none">
-        <SingleCloud scale={0.65 * scale} />
+        <SingleCloud scale={0.65 * scale} color={cloudColor} opacity={cloudOpacity} />
       </Animated.View>
     </>
   );
@@ -466,14 +494,14 @@ export function AscendingChart({ width = 200, height = 110 }: { width?: number; 
   );
 }
 
-function SingleCloud({ scale = 1 }: { scale?: number }) {
+function SingleCloud({ scale = 1, color = '#FFFFFF', opacity = 0.9 }: { scale?: number; color?: string; opacity?: number }) {
   const w = 96 * scale;
   const h = 44 * scale;
   return (
     <Svg width={w} height={h} viewBox="0 0 96 44">
-      <Ellipse cx={34} cy={24} rx={26} ry={14} fill="#FFFFFF" opacity={0.9} />
-      <Ellipse cx={56} cy={28} rx={18} ry={11} fill="#FFFFFF" opacity={0.9} />
-      <Ellipse cx={18} cy={30} rx={16} ry={10} fill="#FFFFFF" opacity={0.9} />
+      <Ellipse cx={34} cy={24} rx={26} ry={14} fill={color} opacity={opacity} />
+      <Ellipse cx={56} cy={28} rx={18} ry={11} fill={color} opacity={opacity} />
+      <Ellipse cx={18} cy={30} rx={16} ry={10} fill={color} opacity={opacity} />
     </Svg>
   );
 }
@@ -521,6 +549,135 @@ const styles = StyleSheet.create({
     left: 0,
   },
 });
+
+export type DayPeriod = 'morning' | 'afternoon' | 'evening' | 'night';
+
+export function getDayPeriod(hour: number = new Date().getHours()): DayPeriod {
+  if (hour >= 5 && hour < 12) return 'morning';
+  if (hour >= 12 && hour < 17) return 'afternoon';
+  if (hour >= 17 && hour < 20) return 'evening';
+  return 'night';
+}
+
+// Two-stop sky gradients per time of day — a soft sunrise blend, a clear midday blue, a dramatic
+// dusk purple-to-orange, and a deep starry navy, rather than a single flat fill.
+const PERIOD_SKY_GRADIENT: Record<DayPeriod, [string, string]> = {
+  morning: ['#FDEFD8', '#CDE7D8'],
+  afternoon: ['#BCE3EF', COLORS.primaryLight],
+  evening: ['#6B5B95', '#F0996B'],
+  night: ['#0F1B2E', '#324259'],
+};
+
+const PERIOD_HILL: Record<DayPeriod, { far: string; mid: string; near: string }> = {
+  morning: { far: '#A9C9AE', mid: '#7FA878', near: COLORS.primaryDark },
+  afternoon: { far: COLORS.primaryLight, mid: COLORS.primary, near: COLORS.primaryDark },
+  evening: { far: '#C98B6E', mid: '#9C6B57', near: '#5C4438' },
+  night: { far: '#2B3648', mid: '#212B3A', near: '#161E29' },
+};
+
+// A banner that actually reflects the real time of day — sunrise, midday, sunset, or a starry
+// night sky, each with its own gradient, glow, and rolling hills — rather than a flat-color
+// backdrop with hard-edged triangle "mountains." Distinct every time you open the app.
+export function TimeOfDayScene({ width, height = 140 }: { width: number; height?: number }) {
+  const period = getDayPeriod();
+  const isNight = period === 'night';
+  const isEvening = period === 'evening';
+  const glow = useRef(new Animated.Value(0)).current;
+  const twinkle = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const glowLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glow, { toValue: 1, duration: 1800, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+        Animated.timing(glow, { toValue: 0, duration: 1800, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+      ])
+    );
+    const twinkleLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(twinkle, { toValue: 1, duration: 1200, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+        Animated.timing(twinkle, { toValue: 0, duration: 1200, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+      ])
+    );
+    glowLoop.start();
+    twinkleLoop.start();
+    return () => {
+      glowLoop.stop();
+      twinkleLoop.stop();
+    };
+  }, [glow, twinkle]);
+
+  const glowRadius = glow.interpolate({ inputRange: [0, 1], outputRange: [30, 40] });
+  const starOpacityA = twinkle.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] });
+  const starOpacityB = twinkle.interpolate({ inputRange: [0, 1], outputRange: [1, 0.3] });
+  const [skyTop, skyBottom] = PERIOD_SKY_GRADIENT[period];
+  const hill = PERIOD_HILL[period];
+  const gradId = `sky-${period}`;
+  const sunGlowId = `glow-${period}`;
+  const orbFill = isEvening ? '#FFD9A8' : '#FFF6DD';
+
+  return (
+    <View style={{ width, height }}>
+      <Svg width={width} height={height} viewBox="0 0 320 140">
+        <Defs>
+          <LinearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={skyTop} />
+            <Stop offset="1" stopColor={skyBottom} />
+          </LinearGradient>
+          <RadialGradient id={sunGlowId} cx="50%" cy="50%" r="50%">
+            <Stop offset="0" stopColor={orbFill} stopOpacity={0.55} />
+            <Stop offset="1" stopColor={orbFill} stopOpacity={0} />
+          </RadialGradient>
+          <RadialGradient id={`moon-glow-${period}`} cx="50%" cy="50%" r="50%">
+            <Stop offset="0" stopColor="#AEC2E0" stopOpacity={0.5} />
+            <Stop offset="1" stopColor="#AEC2E0" stopOpacity={0} />
+          </RadialGradient>
+        </Defs>
+
+        <Rect x={0} y={0} width={320} height={140} fill={`url(#${gradId})`} />
+
+        {isNight ? (
+          <>
+            <Circle cx={250} cy={36} r={36} fill={`url(#moon-glow-${period})`} />
+            <Circle cx={250} cy={36} r={17} fill="#E9EDF5" />
+            <Circle cx={244} cy={30} r={14} fill={skyTop} />
+            <Circle cx={244} cy={40} r={2} fill="#C7D1E0" opacity={0.6} />
+            <Circle cx={253} cy={44} r={1.4} fill="#C7D1E0" opacity={0.5} />
+            <AnimatedCircle cx={54} cy={26} r={1.8} fill="white" opacity={starOpacityA} />
+            <AnimatedCircle cx={94} cy={48} r={1.4} fill="white" opacity={starOpacityB} />
+            <AnimatedCircle cx={144} cy={18} r={1.8} fill="white" opacity={starOpacityA} />
+            <AnimatedCircle cx={184} cy={42} r={1.4} fill="white" opacity={starOpacityB} />
+            <AnimatedCircle cx={26} cy={56} r={1.4} fill="white" opacity={starOpacityA} />
+            <AnimatedCircle cx={210} cy={16} r={1.6} fill="white" opacity={starOpacityB} />
+            <AnimatedCircle cx={288} cy={70} r={1.4} fill="white" opacity={starOpacityA} />
+          </>
+        ) : (
+          <>
+            <AnimatedCircle cx={252} cy={38} r={glowRadius} fill={`url(#${sunGlowId})`} />
+            <Circle cx={252} cy={38} r={19} fill={orbFill} />
+            <Circle cx={252} cy={38} r={19} fill="none" stroke={isEvening ? COLORS.accent : '#F5EAC2'} strokeWidth={1} opacity={0.5} />
+          </>
+        )}
+
+        {!isNight && (
+          <>
+            <Path d="M40,26 Q46,20 52,26 Q58,20 64,26" stroke={isEvening ? '#7A5B7A' : '#8FAE99'} strokeWidth={1.6} fill="none" strokeLinecap="round" opacity={0.55} />
+            <Path d="M170,16 Q175,11 180,16 Q185,11 190,16" stroke={isEvening ? '#7A5B7A' : '#8FAE99'} strokeWidth={1.4} fill="none" strokeLinecap="round" opacity={0.45} />
+          </>
+        )}
+
+        {/* Rolling hills, three soft layers for depth instead of flat triangles */}
+        <Path d="M0,88 Q60,58 130,80 Q200,102 260,64 Q290,48 320,58 V140 H0 Z" fill={hill.far} opacity={0.85} />
+        <Path d="M0,104 Q70,76 150,98 Q220,118 280,88 Q300,80 320,86 V140 H0 Z" fill={hill.mid} opacity={0.9} />
+        <Path d="M0,118 Q80,96 160,114 Q230,130 320,108 V140 H0 Z" fill={hill.near} />
+
+        <PineTree x={32} y={116} scale={0.72} />
+        <PineTree x={58} y={126} scale={0.5} />
+        <PineTree x={278} y={112} scale={0.8} />
+        <PineTree x={301} y={124} scale={0.55} />
+      </Svg>
+    </View>
+  );
+}
 
 function CloudCluster({ cx, cy, scale = 1 }: { cx: number; cy: number; scale?: number }) {
   return (

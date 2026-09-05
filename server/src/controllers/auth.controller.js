@@ -1,4 +1,6 @@
 const User = require('../models/User');
+const Guardian = require('../models/Guardian');
+const Journey = require('../models/Journey');
 const jwt = require('jsonwebtoken');
 
 const generateToken = (id) => {
@@ -78,7 +80,85 @@ const loginUser = async (req, res, next) => {
   }
 };
 
+// @desc    Update the logged-in user's name/phone
+// @route   PUT /api/auth/me
+// @access  Private
+const updateProfile = async (req, res, next) => {
+  try {
+    const { name, phone } = req.body;
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      res.status(404);
+      throw new Error('User not found');
+    }
+
+    if (name) user.name = name;
+    if (phone) user.phone = phone;
+    await user.save();
+
+    res.json({
+      success: true,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        profileImage: user.profileImage,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Change the logged-in user's password
+// @route   PUT /api/auth/password
+// @access  Private
+const changePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      res.status(400);
+      throw new Error('Current and new password are required');
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user || !(await user.matchPassword(currentPassword))) {
+      res.status(401);
+      throw new Error('Current password is incorrect');
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    res.json({ success: true, message: 'Password updated' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Permanently delete the logged-in user's account and their data
+// @route   DELETE /api/auth/me
+// @access  Private
+const deleteAccount = async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+    await Promise.all([
+      Guardian.deleteMany({ user: userId }),
+      Journey.deleteMany({ user: userId }),
+      User.findByIdAndDelete(userId),
+    ]);
+    res.json({ success: true, message: 'Account deleted' });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
+  updateProfile,
+  changePassword,
+  deleteAccount,
 };

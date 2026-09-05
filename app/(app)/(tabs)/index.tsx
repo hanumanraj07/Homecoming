@@ -1,29 +1,55 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
-  StatusBar,
   Animated,
   Easing,
+  StatusBar,
+  Pressable,
+  ActivityIndicator,
 } from 'react-native';
 import { useAuth } from '../../../context/AuthContext';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { CategoryBadge, SunHillsBanner, DriftingClouds, WalkingTraveler } from '../../../components/Illustrations';
+import { api } from '../../../services/api';
+import { CategoryBadge, TimeOfDayScene, DriftingClouds, WalkingTraveler, getDayPeriod } from '../../../components/Illustrations';
 import { HamburgerMenu } from '../../../components/HamburgerMenu';
-import { COLORS, FONTS, RADIUS, SPACING, SCREEN_WIDTH } from '../../../theme/colors';
+import { COLORS, FONTS, RADIUS, SPACING, SCREEN_WIDTH, SHADOW } from '../../../theme/colors';
 
 const getGreeting = () => {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 17) return 'Good afternoon';
-  return 'Good evening';
+  const period = getDayPeriod();
+  if (period === 'morning') return 'Good morning';
+  if (period === 'afternoon') return 'Good afternoon';
+  if (period === 'evening') return 'Good evening';
+  return 'Still up';
 };
 
 const BANNER_WIDTH = SCREEN_WIDTH - SPACING.lg * 2;
+
+const STATUS_COLOR: Record<string, string> = {
+  ACTIVE: COLORS.primary,
+  SAFE: COLORS.success,
+  COMPLETED: COLORS.success,
+  'CHECK-IN_MISSED': COLORS.warning,
+  ESCALATED: COLORS.danger,
+  CANCELLED: COLORS.textMuted,
+  PLANNED: COLORS.textMuted,
+};
+
+const TIPS: { icon: keyof typeof Ionicons.glyphMap; text: string }[] = [
+  { icon: 'people-outline', text: "Add at least one trusted contact before starting a journey — they're who gets alerted." },
+  { icon: 'battery-charging-outline', text: 'Keep your phone charged. Low battery can cut off location tracking mid-trip.' },
+  { icon: 'star-outline', text: 'Mark your most important contact as Priority for one-tap calling in an emergency.' },
+  { icon: 'call-outline', text: 'Use Fake Call from the Safety tab whenever you need a quick, believable exit.' },
+  { icon: 'location-outline', text: 'Keep location permission "Always Allow" so tracking keeps working while the app is backgrounded.' },
+];
+
+function formatRelativeDate(dateStr?: string) {
+  if (!dateStr) return '';
+  return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
 
 // Staggered "the page is waking up" entrance — each section rises + fades in a beat after the
 // last, rather than the whole screen appearing at once.
@@ -44,6 +70,72 @@ function useRise(delay: number) {
   };
 }
 
+// A button that visibly compresses on press and springs back — small tactile feedback used on
+// every tappable card on this screen instead of the flatter default TouchableOpacity feel.
+function PressScale({
+  children,
+  onPress,
+  style,
+}: {
+  children: React.ReactNode;
+  onPress: () => void;
+  style?: any;
+}) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const pressIn = () => Animated.spring(scale, { toValue: 0.95, useNativeDriver: true, speed: 40, bounciness: 6 }).start();
+  const pressOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 30, bounciness: 8 }).start();
+  return (
+    <Pressable onPress={onPress} onPressIn={pressIn} onPressOut={pressOut}>
+      <Animated.View style={[style, { transform: [{ scale }] }]}>{children}</Animated.View>
+    </Pressable>
+  );
+}
+
+// Auto-advancing safety tips, crossfading every few seconds, with tappable dots to jump directly
+// to one — replaces what used to be a single static tip that never changed.
+function TipsCarousel() {
+  const [index, setIndex] = useState(0);
+  const fade = useRef(new Animated.Value(1)).current;
+
+  const goTo = useCallback(
+    (next: number) => {
+      Animated.timing(fade, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+        setIndex(next);
+        Animated.timing(fade, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+      });
+    },
+    [fade]
+  );
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      goTo((index + 1) % TIPS.length);
+    }, 4500);
+    return () => clearInterval(interval);
+  }, [index, goTo]);
+
+  const tip = TIPS[index];
+
+  return (
+    <View style={styles.tipsCard}>
+      <Animated.View style={{ opacity: fade, flexDirection: 'row', alignItems: 'flex-start', gap: SPACING.sm }}>
+        <Ionicons name={tip.icon} size={20} color={COLORS.warning} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.tipTitle}>Safety Tip</Text>
+          <Text style={styles.tipText}>{tip.text}</Text>
+        </View>
+      </Animated.View>
+      <View style={styles.tipDots}>
+        {TIPS.map((_, i) => (
+          <TouchableOpacity key={i} onPress={() => goTo(i)} hitSlop={6}>
+            <View style={[styles.tipDot, i === index && styles.tipDotActive]} />
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 export default function HomeScreen() {
   const { user } = useAuth();
   const router = useRouter();
@@ -54,6 +146,11 @@ export default function HomeScreen() {
   const ctaAnim = useRise(230);
   const actionsAnim = useRise(300);
   const tipsAnim = useRise(370);
+
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const onScroll = Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true });
+  const parallaxY = scrollY.interpolate({ inputRange: [-120, 0, 120], outputRange: [24, 0, -18], extrapolate: 'clamp' });
+  const parallaxScale = scrollY.interpolate({ inputRange: [-120, 0], outputRange: [1.15, 1], extrapolate: 'clamp' });
 
   // A slow "breathing" pulse on the status dot — a small, continuous cue that the app is
   // actively watching, not a static screenshot.
@@ -71,6 +168,36 @@ export default function HomeScreen() {
   const dotScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.5] });
   const dotOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.9, 0.3] });
 
+  // The status card used to always say "No Active Journey" regardless of reality — a real gap in
+  // a safety app, since reopening the app during a live journey should surface that immediately.
+  // Now it reflects the most recent journey: in progress, or a summary of the last completed one.
+  const [recentJourney, setRecentJourney] = useState<any>(null);
+  const [isLoadingJourney, setIsLoadingJourney] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        try {
+          const response = await api.get('/journeys');
+          if (!cancelled && response.data.success) {
+            setRecentJourney(response.data.data[0] || null);
+          }
+        } catch (err) {
+          console.error('Failed to load recent journey for home status', err);
+        } finally {
+          if (!cancelled) setIsLoadingJourney(false);
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [])
+  );
+
+  const isActive = recentJourney?.status === 'ACTIVE';
+  const statusColor = recentJourney ? STATUS_COLOR[recentJourney.status] || COLORS.textMuted : COLORS.textMuted;
+
   const quickActions: { label: string; badge: 'contacts' | 'history' | 'call' | 'profile'; route: string }[] = [
     { label: 'Contacts', badge: 'contacts', route: '/(app)/(tabs)/contacts' },
     { label: 'History', badge: 'history', route: '/(app)/(tabs)/journeys' },
@@ -81,7 +208,12 @@ export default function HomeScreen() {
   return (
     <View style={styles.root}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.bg} />
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <Animated.ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+      >
 
         {/* Header */}
         <Animated.View style={[styles.header, headerAnim]}>
@@ -92,37 +224,88 @@ export default function HomeScreen() {
           <HamburgerMenu />
         </Animated.View>
 
-        {/* Illustrated banner — a little scene that's actually alive: clouds drift, a traveler walks */}
-        <Animated.View style={[styles.banner, bannerAnim]}>
-          <SunHillsBanner height={130} />
-          <DriftingClouds width={BANNER_WIDTH} height={130} />
-          <WalkingTraveler width={BANNER_WIDTH} bottom={16} />
+        {/* Illustrated banner — reflects the real time of day, with clouds drifting by day and
+            stars twinkling by night, plus a little traveler always on the move. Shadow lives on
+            this outer wrapper and clipping on the inner one — a rounded view can't do both
+            itself, since overflow:hidden would clip its own shadow away on iOS. */}
+        <Animated.View
+          style={[
+            styles.bannerShadowWrap,
+            { opacity: bannerAnim.opacity, transform: [...bannerAnim.transform, { translateY: parallaxY }, { scale: parallaxScale }] },
+          ]}
+        >
+          <View style={styles.banner}>
+            <TimeOfDayScene width={BANNER_WIDTH} height={160} />
+            <DriftingClouds width={BANNER_WIDTH} height={160} night={getDayPeriod() === 'night'} />
+            <WalkingTraveler width={BANNER_WIDTH} bottom={20} />
+          </View>
         </Animated.View>
 
-        {/* Safety Status Card */}
+        {/* Journey Status Card — dynamic, not a static placeholder */}
         <Animated.View style={[styles.statusCard, statusAnim]}>
           <View style={styles.statusIndicator}>
             <View style={styles.statusDotWrap}>
-              <Animated.View style={[styles.statusDotPulse, { opacity: dotOpacity, transform: [{ scale: dotScale }] }]} />
-              <View style={styles.statusDot} />
+              <Animated.View
+                style={[
+                  styles.statusDotPulse,
+                  { backgroundColor: statusColor, opacity: dotOpacity, transform: [{ scale: dotScale }] },
+                ]}
+              />
+              <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
             </View>
             <Text style={styles.statusLabel}>Status</Text>
           </View>
-          <Text style={styles.statusValue}>No Active Journey</Text>
-          <Text style={styles.statusSub}>You're currently not on a journey. Start one when you're ready.</Text>
+
+          {isLoadingJourney ? (
+            <ActivityIndicator size="small" color={COLORS.primary} style={{ alignSelf: 'flex-start', marginVertical: 4 }} />
+          ) : isActive ? (
+            <>
+              <Text style={styles.statusValue}>Journey in Progress</Text>
+              <Text style={styles.statusSub} numberOfLines={1}>→ {recentJourney.destination?.address || 'Unknown destination'}</Text>
+              <TouchableOpacity
+                style={styles.statusLink}
+                onPress={() => router.push(`/(app)/journey/${recentJourney._id}` as any)}
+              >
+                <Text style={styles.statusLinkText}>View Journey</Text>
+                <Ionicons name="chevron-forward" size={14} color={COLORS.primary} />
+              </TouchableOpacity>
+            </>
+          ) : recentJourney ? (
+            <>
+              <Text style={styles.statusValue}>No Active Journey</Text>
+              <Text style={styles.statusSub} numberOfLines={1}>
+                Last trip: {recentJourney.name} · {formatRelativeDate(recentJourney.createdAt)}
+              </Text>
+              <TouchableOpacity
+                style={styles.statusLink}
+                onPress={() => router.push(`/(app)/journey/${recentJourney._id}` as any)}
+              >
+                <Text style={styles.statusLinkText}>View Details</Text>
+                <Ionicons name="chevron-forward" size={14} color={COLORS.primary} />
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <Text style={styles.statusValue}>No Active Journey</Text>
+              <Text style={styles.statusSub}>You're currently not on a journey. Start one when you're ready.</Text>
+            </>
+          )}
         </Animated.View>
 
-        {/* Start Journey CTA */}
+        {/* Start Journey CTA — repurposed to jump back into an active journey if one exists */}
         <Animated.View style={ctaAnim}>
-          <TouchableOpacity
+          <PressScale
             style={styles.startButton}
-            onPress={() => router.push('/(app)/journey/new')}
-            activeOpacity={0.85}
+            onPress={() =>
+              isActive
+                ? router.push(`/(app)/journey/${recentJourney._id}` as any)
+                : router.push('/(app)/journey/new')
+            }
           >
-            <Ionicons name="navigate" size={24} color="white" />
-            <Text style={styles.startButtonText}>Start a Journey</Text>
+            <Ionicons name={isActive ? 'navigate-circle' : 'navigate'} size={24} color="white" />
+            <Text style={styles.startButtonText}>{isActive ? 'View Active Journey' : 'Start a Journey'}</Text>
             <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.7)" />
-          </TouchableOpacity>
+          </PressScale>
         </Animated.View>
 
         {/* Quick Actions */}
@@ -130,29 +313,20 @@ export default function HomeScreen() {
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.quickActions}>
             {quickActions.map((action) => (
-              <TouchableOpacity
-                key={action.label}
-                style={styles.quickActionItem}
-                onPress={() => router.push(action.route as any)}
-                activeOpacity={0.8}
-              >
+              <PressScale key={action.label} style={styles.quickActionItem} onPress={() => router.push(action.route as any)}>
                 <CategoryBadge type={action.badge} size={60} />
                 <Text style={styles.quickActionLabel}>{action.label}</Text>
-              </TouchableOpacity>
+              </PressScale>
             ))}
           </View>
         </Animated.View>
 
-        {/* Tips Card */}
-        <Animated.View style={[styles.tipsCard, tipsAnim]}>
-          <Ionicons name="bulb-outline" size={20} color={COLORS.warning} style={{ marginBottom: 8 }} />
-          <Text style={styles.tipTitle}>Safety Tip</Text>
-          <Text style={styles.tipText}>
-            Always add at least one trusted contact before starting a journey. They'll be alerted if you miss a check-in.
-          </Text>
+        {/* Rotating Safety Tips */}
+        <Animated.View style={tipsAnim}>
+          <TipsCarousel />
         </Animated.View>
 
-      </ScrollView>
+      </Animated.ScrollView>
     </View>
   );
 }
@@ -184,11 +358,15 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     marginTop: 2,
   },
+  bannerShadowWrap: {
+    borderRadius: RADIUS.xl,
+    marginBottom: SPACING.md,
+    ...SHADOW.medium,
+  },
   banner: {
-    height: 130,
+    height: 160,
     borderRadius: RADIUS.xl,
     overflow: 'hidden',
-    marginBottom: SPACING.md,
   },
   statusCard: {
     backgroundColor: COLORS.bgCard,
@@ -197,6 +375,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
     borderWidth: 1,
     borderColor: COLORS.border,
+    ...SHADOW.small,
   },
   statusIndicator: {
     flexDirection: 'row',
@@ -215,13 +394,11 @@ const styles = StyleSheet.create({
     width: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: COLORS.textMuted,
   },
   statusDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: COLORS.textMuted,
   },
   statusLabel: {
     fontSize: 12,
@@ -241,6 +418,17 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     lineHeight: 18,
   },
+  statusLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    marginTop: SPACING.sm,
+  },
+  statusLinkText: {
+    fontSize: 13,
+    fontWeight: FONTS.semiBold,
+    color: COLORS.primary,
+  },
   startButton: {
     backgroundColor: COLORS.accent,
     borderRadius: RADIUS.full,
@@ -249,6 +437,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: SPACING.xl,
+    shadowColor: COLORS.accentDark,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 6,
   },
   startButtonText: {
     color: 'white',
@@ -283,6 +476,7 @@ const styles = StyleSheet.create({
     padding: SPACING.lg,
     borderWidth: 1,
     borderColor: COLORS.warning + '40',
+    ...SHADOW.small,
   },
   tipTitle: {
     fontSize: 15,
@@ -294,5 +488,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.textSecondary,
     lineHeight: 20,
+  },
+  tipDots: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: SPACING.md,
+  },
+  tipDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: COLORS.border,
+  },
+  tipDotActive: {
+    backgroundColor: COLORS.warning,
+    width: 16,
   },
 });

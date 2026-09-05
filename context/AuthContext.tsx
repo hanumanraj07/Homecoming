@@ -7,6 +7,7 @@ interface AuthContextType {
   user: any | null;
   login: (token: string, user: any) => Promise<void>;
   logout: () => Promise<void>;
+  updateUser: (user: any) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -15,6 +16,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   login: async () => {},
   logout: async () => {},
+  updateUser: async () => {},
   isLoading: true,
 });
 
@@ -57,6 +59,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  // Applies a fresh user object (e.g. after editing name/phone) to both state and storage, so
+  // the change shows up immediately everywhere the user is displayed without re-logging in.
+  const updateUser = useCallback(async (newUser: any) => {
+    try {
+      await SecureStore.setItemAsync('userData', JSON.stringify(newUser));
+      setUser(newUser);
+    } catch (e) {
+      console.error('Failed to persist updated user', e);
+    }
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await SecureStore.deleteItemAsync('userToken');
@@ -79,7 +92,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [logout]);
 
   return (
-    <AuthContext.Provider value={{ token, user, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ token, user, login, logout, updateUser, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

@@ -19,6 +19,11 @@ export default function AppLayout() {
         <Stack.Screen name="insights" />
         <Stack.Screen name="templates" />
         <Stack.Screen name="favorites" />
+        <Stack.Screen name="edit-profile" />
+        <Stack.Screen name="notifications" />
+        <Stack.Screen name="privacy" />
+        <Stack.Screen name="help" />
+        <Stack.Screen name="about" />
       </Stack>
     </GestureHandlerRootView>
   );

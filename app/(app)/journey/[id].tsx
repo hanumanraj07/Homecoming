@@ -24,6 +24,7 @@ import { api } from '../../../services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { CategoryBadge, JourneyCompleteScene } from '../../../components/Illustrations';
 import { fetchRouteSummary, RouteCoordinate } from '../../../services/routing';
+import { loadNotificationSettings, NotificationSettings } from '../../../services/settings';
 import { COLORS, FONTS, RADIUS, SPACING } from '../../../theme/colors';
 
 const MISSED_CHECKIN_COUNTDOWN_SECONDS = 30;
@@ -50,6 +51,14 @@ export default function ActiveJourneyScreen() {
 
   const hasWarnedLowBatteryRef = useRef(false);
   const [showCompleteCelebration, setShowCompleteCelebration] = useState(false);
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
+    missedCheckInAlerts: true,
+    lowBatteryWarnings: true,
+  });
+
+  useEffect(() => {
+    loadNotificationSettings().then(setNotificationSettings);
+  }, []);
   const celebrationTextAnim = useRef(new Animated.Value(0)).current;
 
   const isActive = journey?.status === 'ACTIVE';
@@ -256,7 +265,7 @@ export default function ActiveJourneyScreen() {
   // timestamp) naturally re-arms detection for the *next* interval instead of re-firing
   // immediately or never firing again for the rest of the journey.
   useEffect(() => {
-    if (!isActive || !journey?.lastCheckIn || !journey?.checkInInterval) return;
+    if (!isActive || !journey?.lastCheckIn || !journey?.checkInInterval || !notificationSettings.missedCheckInAlerts) return;
 
     const check = () => {
       const deadline =
@@ -275,7 +284,7 @@ export default function ActiveJourneyScreen() {
     check();
     const poll = setInterval(check, 15000);
     return () => clearInterval(poll);
-  }, [isActive, journey?.lastCheckIn, journey?.checkInInterval, journey?.gracePeriod, missedCheckInVisible]);
+  }, [isActive, journey?.lastCheckIn, journey?.checkInInterval, journey?.gracePeriod, missedCheckInVisible, notificationSettings.missedCheckInAlerts]);
 
   useEffect(() => {
     if (!missedCheckInVisible) {
@@ -311,7 +320,7 @@ export default function ActiveJourneyScreen() {
   // the user (whose battery it actually is) with a one-tap way to let contacts know tracking
   // might stop soon, same tap-to-send pattern as the Emergency button.
   useEffect(() => {
-    if (!isActive) return;
+    if (!isActive || !notificationSettings.lowBatteryWarnings) return;
 
     const sub = Battery.addBatteryLevelListener(({ batteryLevel }) => {
       if (batteryLevel <= LOW_BATTERY_THRESHOLD && !hasWarnedLowBatteryRef.current) {
@@ -342,7 +351,7 @@ export default function ActiveJourneyScreen() {
     });
 
     return () => sub.remove();
-  }, [isActive, journey?.name]);
+  }, [isActive, journey?.name, notificationSettings.lowBatteryWarnings]);
 
   useEffect(() => {
     if (!showCompleteCelebration) return;
